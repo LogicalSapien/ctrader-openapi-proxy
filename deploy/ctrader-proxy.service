@@ -1,0 +1,18 @@
+[Unit]
+Description=cTrader OpenAPI Proxy
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__WORKDIR__
+EnvironmentFile=__WORKDIR__/.env
+ExecStart=__WORKDIR__/venv/bin/python main.py
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
