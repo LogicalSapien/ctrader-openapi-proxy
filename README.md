@@ -62,6 +62,21 @@ The proxy starts at `http://localhost:9009`.
 
 See [skills/README.md](skills/README.md) for full request/response examples, curl commands, and a Python usage guide.
 
+## OpenClaw / ClawHub Skill
+
+A ready-to-import OpenClaw skill is in [`skills/clawhub/`](skills/clawhub/). Install it into your OpenClaw workspace:
+
+```bash
+# Copy the skill into your OpenClaw workspace skills folder
+cp -r skills/clawhub ~/.openclaw/skills/ctrader-commander
+
+# Or publish to ClawHub for sharing/reuse
+npm i -g clawhub
+clawhub publish skills/clawhub --slug ctrader-commander --name "cTrader Commander" --version 1.0.0 --tags latest
+```
+
+Once installed, the agent knows how to look up symbol IDs, fetch candles, get live quotes, and place/close orders via the proxy.
+
 > **Symbol IDs are broker-specific.** Before placing orders or fetching candle data, run `GET /get-data?command=ProtoOASymbolsListReq` to retrieve the list of symbols and their IDs for your broker. See [Finding your Symbol IDs](skills/README.md#finding-your-symbol-ids) in the skills guide.
 
 ## Deploy on Ubuntu Server
