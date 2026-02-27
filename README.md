@@ -64,15 +64,18 @@ See [skills/README.md](skills/README.md) for full request/response examples, cur
 
 ## OpenClaw / ClawHub Skill
 
-A ready-to-import OpenClaw skill is in [`skills/clawhub/`](skills/clawhub/). Install it into your OpenClaw workspace:
+The OpenClaw skill for this proxy lives in a dedicated skills repo:
+**https://github.com/LogicalSapien/agent-skills**
 
+Install from ClawHub:
 ```bash
-# Copy the skill into your OpenClaw workspace skills folder
-cp -r skills/clawhub ~/.openclaw/skills/ctrader-commander
+npx clawhub@latest install ctrader-commander
+```
 
-# Or publish to ClawHub for sharing/reuse
-npm i -g clawhub
-clawhub publish skills/clawhub --slug ctrader-commander --name "cTrader Commander" --version 1.0.0 --tags latest
+Or install directly from the skills repo:
+```bash
+git clone https://github.com/LogicalSapien/agent-skills
+cp -r agent-skills/ctrader-commander ~/.openclaw/skills/ctrader-commander
 ```
 
 Once installed, the agent knows how to look up symbol IDs, fetch candles, get live quotes, and place/close orders via the proxy.
