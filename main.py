@@ -238,6 +238,7 @@ def sendProtoOADealOffsetListReq(dealId, clientMsgId=None):
     request.dealId = int(dealId)
     deferred = client.send(request, clientMsgId=clientMsgId)
     deferred.addErrback(onError)
+    return deferred
 
 def sendProtoOAGetPositionUnrealizedPnLReq(clientMsgId=None):
     request = ProtoOAGetPositionUnrealizedPnLReq()
@@ -252,21 +253,70 @@ def sendProtoOAOrderDetailsReq(orderId, clientMsgId=None):
     request.orderId = int(orderId)
     deferred = client.send(request, clientMsgId=clientMsgId)
     deferred.addErrback(onError)
+    return deferred
 
 def sendProtoOAOrderListByPositionIdReq(positionId, fromTimestamp=None, toTimestamp=None, clientMsgId=None):
     request = ProtoOAOrderListByPositionIdReq()
     request.ctidTraderAccountId = currentAccountId
     request.positionId = int(positionId)
-    deferred = client.send(request, fromTimestamp=fromTimestamp, toTimestamp=toTimestamp, clientMsgId=clientMsgId)
+    if fromTimestamp is not None:
+        request.fromTimestamp = int(fromTimestamp)
+    if toTimestamp is not None:
+        request.toTimestamp = int(toTimestamp)
+    deferred = client.send(request, clientMsgId=clientMsgId)
     deferred.addErrback(onError)
+    return deferred
 
-def sendProtoOAGetDealListReq(fromTimestamp, toTimestamp, maxRows=None, clientMsgId=None):
-    request = ProtoOAGetDealListReq()
+def sendProtoOADealListReq(fromTimestamp, toTimestamp, clientMsgId=None):
+    request = ProtoOADealListReq()
     request.ctidTraderAccountId = currentAccountId
     request.fromTimestamp = int(fromTimestamp)
     request.toTimestamp = int(toTimestamp)
-    if maxRows is not None:
-        request.maxRows = int(maxRows)
+    deferred = client.send(request, clientMsgId=clientMsgId)
+    deferred.addErrback(onError)
+    return deferred
+
+def sendProtoOADealListByPositionIdReq(positionId, clientMsgId=None):
+    request = ProtoOADealListByPositionIdReq()
+    request.ctidTraderAccountId = currentAccountId
+    request.positionId = int(positionId)
+    deferred = client.send(request, clientMsgId=clientMsgId)
+    deferred.addErrback(onError)
+    return deferred
+
+def sendProtoOAOrderListReq(fromTimestamp, toTimestamp, clientMsgId=None):
+    request = ProtoOAOrderListReq()
+    request.ctidTraderAccountId = currentAccountId
+    request.fromTimestamp = int(fromTimestamp)
+    request.toTimestamp = int(toTimestamp)
+    deferred = client.send(request, clientMsgId=clientMsgId)
+    deferred.addErrback(onError)
+    return deferred
+
+def sendProtoOAAmendPositionSLTPReq(positionId, stopLoss=None, takeProfit=None, trailingStopLoss=None, clientMsgId=None):
+    request = ProtoOAAmendPositionSLTPReq()
+    request.ctidTraderAccountId = currentAccountId
+    request.positionId = int(positionId)
+    if stopLoss not in (None, ""):
+        request.stopLoss = float(stopLoss)
+    if takeProfit not in (None, ""):
+        request.takeProfit = float(takeProfit)
+    if trailingStopLoss not in (None, ""):
+        request.trailingStopLoss = bool(trailingStopLoss)
+    deferred = client.send(request, clientMsgId=clientMsgId)
+    deferred.addErrback(onError)
+    return deferred
+
+def sendProtoOAAmendOrderReq(orderId, volume=None, limitPrice=None, stopPrice=None, clientMsgId=None):
+    request = ProtoOAAmendOrderReq()
+    request.ctidTraderAccountId = currentAccountId
+    request.orderId = int(orderId)
+    if volume not in (None, ""):
+        request.volume = int(float(volume))
+    if limitPrice not in (None, ""):
+        request.limitPrice = float(limitPrice)
+    if stopPrice not in (None, ""):
+        request.stopPrice = float(stopPrice)
     deferred = client.send(request, clientMsgId=clientMsgId)
     deferred.addErrback(onError)
     return deferred
@@ -301,11 +351,15 @@ commands = {
     "GetPositionUnrealizedPnL": sendProtoOAGetPositionUnrealizedPnLReq,
     "OrderDetails": sendProtoOAOrderDetailsReq,
     "OrderListByPositionId": sendProtoOAOrderListByPositionIdReq,
-    "ProtoOAGetDealListReq": sendProtoOAGetDealListReq,
+    "ProtoOADealListReq": sendProtoOADealListReq,
+    "DealListByPositionId": sendProtoOADealListByPositionIdReq,
+    "ProtoOAOrderListReq": sendProtoOAOrderListReq,
     "ProtoOAExpectedMarginReq": sendProtoOAExpectedMarginReq,
 }
 
 def encodeResult(result):
+    if result is None:
+        return b'{}'
     if type(result) is str:
         return f'{{"result": "{result}"}}'.encode(encoding='UTF-8')
     else:
@@ -401,6 +455,40 @@ def http_live_quote(request):
     except (ValueError, KeyError):
         request.setResponseCode(400)
         return json.dumps({'error': 'unexpected input/output'}).encode('utf-8')
+
+@app.route('/api/amend-position', methods=['POST'])
+def http_amend_position(request):
+    """Amend stop loss / take profit on an open position."""
+    body = request.content.read().decode('utf-8')
+    try:
+        data = json.loads(body)
+        positionId = data['positionId']
+        stopLoss = data.get('stopLoss')
+        takeProfit = data.get('takeProfit')
+        trailingStopLoss = data.get('trailingStopLoss')
+        result = sendProtoOAAmendPositionSLTPReq(positionId, stopLoss, takeProfit, trailingStopLoss)
+        result.addCallback(encodeResult)
+        return result
+    except (ValueError, KeyError):
+        request.setResponseCode(400)
+        return json.dumps({'error': 'expected { positionId, stopLoss?, takeProfit?, trailingStopLoss? }'}).encode('utf-8')
+
+@app.route('/api/amend-order', methods=['POST'])
+def http_amend_order(request):
+    """Amend a pending limit or stop order (price and/or volume)."""
+    body = request.content.read().decode('utf-8')
+    try:
+        data = json.loads(body)
+        orderId = data['orderId']
+        volume = data.get('volume')
+        limitPrice = data.get('limitPrice')
+        stopPrice = data.get('stopPrice')
+        result = sendProtoOAAmendOrderReq(orderId, volume, limitPrice, stopPrice)
+        result.addCallback(encodeResult)
+        return result
+    except (ValueError, KeyError):
+        request.setResponseCode(400)
+        return json.dumps({'error': 'expected { orderId, volume?, limitPrice?, stopPrice? }'}).encode('utf-8')
 
 @app.route('/api/market-order', methods=['POST'])
 def http_market_order(request):

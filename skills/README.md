@@ -168,10 +168,48 @@ GET /get-data?command=CancelOrder 789
 
 ---
 
+### Amend Stop Loss / Take Profit on Open Position
+
+```
+POST /api/amend-position
+Content-Type: application/json
+
+{
+  "positionId":      123456,
+  "stopLoss":        1.08500,
+  "takeProfit":      1.09500
+}
+```
+
+- `positionId`: from `ProtoOAReconcileReq`
+- `stopLoss` / `takeProfit`: absolute price levels (optional — omit to leave unchanged)
+- `trailingStopLoss`: `true` to enable trailing stop (optional)
+
+---
+
+### Amend a Pending Order
+
+```
+POST /api/amend-order
+Content-Type: application/json
+
+{
+  "orderId":    789,
+  "limitPrice": 1.08200
+}
+```
+
+- `orderId`: from `ProtoOAReconcileReq`
+- `limitPrice`: new price for LIMIT orders
+- `stopPrice`: new price for STOP orders
+- `volume`: new volume in units (optional)
+
+---
+
 ### Get Deal History (Closed Trades)
 
 ```
-GET /get-data?command=ProtoOAGetDealListReq <fromTimestamp> <toTimestamp>
+GET /get-data?command=ProtoOADealListReq <fromTimestamp> <toTimestamp>
 ```
 
 Timestamps are in **milliseconds** since Unix epoch. Returns all executed deals (closed/partially-closed trades) in the given range. Each deal includes `dealId`, `orderId`, `positionId`, `symbolId`, `tradeSide`, `volume`, `executionPrice`, `commission`, `dealStatus`, and `closePositionDetail` for closing deals.
@@ -180,14 +218,14 @@ Timestamps are in **milliseconds** since Unix epoch. Returns all executed deals 
 ```bash
 NOW_MS=$(python3 -c "import time; print(int(time.time()*1000))")
 FROM_MS=$(python3 -c "import time; print(int(time.time()*1000) - 604800000)")
-curl -s "http://localhost:9009/get-data?command=ProtoOAGetDealListReq%20${FROM_MS}%20${NOW_MS}"
+curl -s "http://localhost:9009/get-data?command=ProtoOADealListReq%20${FROM_MS}%20${NOW_MS}"
 ```
 
 On Linux:
 ```bash
 NOW_MS=$(date +%s%3N)
 FROM_MS=$(( NOW_MS - 604800000 ))
-curl -s "http://localhost:9009/get-data?command=ProtoOAGetDealListReq%20${FROM_MS}%20${NOW_MS}"
+curl -s "http://localhost:9009/get-data?command=ProtoOADealListReq%20${FROM_MS}%20${NOW_MS}"
 ```
 
 ---
@@ -224,7 +262,9 @@ No token required — credentials are read from `.env` on the server.
 | `OrderListByPositionId` | `positionId` | Get order history for a position |
 | `DealOffsetList` | `dealId` | Get offset deals for a deal |
 | `GetPositionUnrealizedPnL` | — | Get unrealised P&L for all open positions |
-| `ProtoOAGetDealListReq` | `fromTimestamp toTimestamp` | **Deal/trade history (closed trades)** |
+| `ProtoOADealListReq` | `fromTimestamp toTimestamp` | **Deal/trade history (closed trades)** |
+| `DealListByPositionId` | `positionId` | Get all deals for a specific position |
+| `ProtoOAOrderListReq` | `fromTimestamp toTimestamp` | All orders (filled, cancelled, etc.) in a time range |
 | `ProtoOAExpectedMarginReq` | `symbolId volume` | Calculate expected margin for a trade |
 
 ---
@@ -353,7 +393,7 @@ print(resp.json())
 now_ms  = int(time.time() * 1000)
 from_ms = now_ms - 7 * 24 * 3_600_000
 resp = requests.get(f"{BASE}/get-data", params={
-    "command": f"ProtoOAGetDealListReq {from_ms} {now_ms}"
+    "command": f"ProtoOADealListReq {from_ms} {now_ms}"
 })
 print(resp.json())
 ```

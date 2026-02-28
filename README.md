@@ -58,6 +58,8 @@ The proxy starts at `http://localhost:9009`.
 | `POST` | `/api/trendbars` | Fetch OHLC candle data |
 | `POST` | `/api/live-quote` | Fetch recent tick/quote data |
 | `POST` | `/api/market-order` | Place a market, limit, or stop order (`volume` in units: 1000 = 0.01 lot) |
+| `POST` | `/api/amend-position` | Amend stop loss / take profit on an open position |
+| `POST` | `/api/amend-order` | Amend price and/or volume of a pending order |
 | `GET` | `/get-data?command=` | Generic command passthrough (no token needed) |
 
 See [skills/README.md](skills/README.md) for full request/response examples, curl commands, and a Python usage guide.
