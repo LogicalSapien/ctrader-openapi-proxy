@@ -260,6 +260,17 @@ def sendProtoOAOrderListByPositionIdReq(positionId, fromTimestamp=None, toTimest
     deferred = client.send(request, fromTimestamp=fromTimestamp, toTimestamp=toTimestamp, clientMsgId=clientMsgId)
     deferred.addErrback(onError)
 
+def sendProtoOAGetDealListReq(fromTimestamp, toTimestamp, maxRows=None, clientMsgId=None):
+    request = ProtoOAGetDealListReq()
+    request.ctidTraderAccountId = currentAccountId
+    request.fromTimestamp = int(fromTimestamp)
+    request.toTimestamp = int(toTimestamp)
+    if maxRows is not None:
+        request.maxRows = int(maxRows)
+    deferred = client.send(request, clientMsgId=clientMsgId)
+    deferred.addErrback(onError)
+    return deferred
+
 def sendProtoOAExpectedMarginReq(symbolId, volume, clientMsgId=None):
     request = ProtoOAExpectedMarginReq()
     request.ctidTraderAccountId = currentAccountId
@@ -290,6 +301,7 @@ commands = {
     "GetPositionUnrealizedPnL": sendProtoOAGetPositionUnrealizedPnLReq,
     "OrderDetails": sendProtoOAOrderDetailsReq,
     "OrderListByPositionId": sendProtoOAOrderListByPositionIdReq,
+    "ProtoOAGetDealListReq": sendProtoOAGetDealListReq,
     "ProtoOAExpectedMarginReq": sendProtoOAExpectedMarginReq,
 }
 

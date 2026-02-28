@@ -168,6 +168,30 @@ GET /get-data?command=CancelOrder 789
 
 ---
 
+### Get Deal History (Closed Trades)
+
+```
+GET /get-data?command=ProtoOAGetDealListReq <fromTimestamp> <toTimestamp>
+```
+
+Timestamps are in **milliseconds** since Unix epoch. Returns all executed deals (closed/partially-closed trades) in the given range. Each deal includes `dealId`, `orderId`, `positionId`, `symbolId`, `tradeSide`, `volume`, `executionPrice`, `commission`, `dealStatus`, and `closePositionDetail` for closing deals.
+
+**Example** — deals from the last 7 days:
+```bash
+NOW_MS=$(python3 -c "import time; print(int(time.time()*1000))")
+FROM_MS=$(python3 -c "import time; print(int(time.time()*1000) - 604800000)")
+curl -s "http://localhost:9009/get-data?command=ProtoOAGetDealListReq%20${FROM_MS}%20${NOW_MS}"
+```
+
+On Linux:
+```bash
+NOW_MS=$(date +%s%3N)
+FROM_MS=$(( NOW_MS - 604800000 ))
+curl -s "http://localhost:9009/get-data?command=ProtoOAGetDealListReq%20${FROM_MS}%20${NOW_MS}"
+```
+
+---
+
 ### Generic Command Endpoint
 For any command not covered by the dedicated routes above:
 
@@ -200,6 +224,7 @@ No token required — credentials are read from `.env` on the server.
 | `OrderListByPositionId` | `positionId` | Get order history for a position |
 | `DealOffsetList` | `dealId` | Get offset deals for a deal |
 | `GetPositionUnrealizedPnL` | — | Get unrealised P&L for all open positions |
+| `ProtoOAGetDealListReq` | `fromTimestamp toTimestamp` | **Deal/trade history (closed trades)** |
 | `ProtoOAExpectedMarginReq` | `symbolId volume` | Calculate expected margin for a trade |
 
 ---
@@ -322,6 +347,14 @@ print(resp.json())
 
 # Cancel a pending order
 resp = requests.get(f"{BASE}/get-data", params={"command": "CancelOrder 789"})
+print(resp.json())
+
+# Deal / trade history — last 7 days (closed trades)
+now_ms  = int(time.time() * 1000)
+from_ms = now_ms - 7 * 24 * 3_600_000
+resp = requests.get(f"{BASE}/get-data", params={
+    "command": f"ProtoOAGetDealListReq {from_ms} {now_ms}"
+})
 print(resp.json())
 ```
 
