@@ -10,9 +10,13 @@ install:
 	@$(VENV)/bin/pip install -r requirements.txt
 	@echo "Done. Copy .env.example to .env and fill in your credentials."
 
-run:
+run: $(PYTHON)
 	@echo "Starting cTrader OpenAPI Proxy on http://localhost:9009 ..."
 	@$(PYTHON) main.py
+
+$(PYTHON):
+	@echo "Virtual environment not found — running install..."
+	@$(MAKE) install
 
 install-service:
 	@echo "Installing systemd service..."
