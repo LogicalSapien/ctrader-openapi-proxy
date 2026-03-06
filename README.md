@@ -15,6 +15,7 @@ Fill in your credentials in `.env`:
 CTRADER_CLIENT_ID=********
 CTRADER_CLIENT_SECRET=********
 CTRADER_TOKEN=********
+CTRADER_REFRESH_TOKEN=********       # for automatic token renewal
 CTRADER_ACCOUNTID=YOUR_ACCOUNT_ID   # your cTrader account ID
 CTRADER_HOST=live            # "demo" or "live"
 CONSOLE_LOG_LEVEL=INFO
@@ -50,6 +51,8 @@ The proxy starts at `http://localhost:9009`.
 
 > **Account auth is automatic.** On startup the proxy reads `CTRADER_ACCOUNTID` from `.env` and authorises that account immediately — no manual `/api/set-account` call required.
 
+> **Token refresh is automatic.** If `CTRADER_REFRESH_TOKEN` is set in `.env`, the proxy refreshes the access token every 6 hours and on auth errors. New tokens are written back to `.env` so they persist across restarts. You can also trigger a manual refresh via `POST /api/refresh-token`.
+
 ## Endpoints
 
 | Method | Path | Description |
@@ -60,6 +63,7 @@ The proxy starts at `http://localhost:9009`.
 | `POST` | `/api/market-order` | Place a market, limit, or stop order (`volume` in units: 1000 = 0.01 lot) |
 | `POST` | `/api/amend-position` | Amend stop loss / take profit on an open position |
 | `POST` | `/api/amend-order` | Amend price and/or volume of a pending order |
+| `POST` | `/api/refresh-token` | Manually refresh the access token |
 | `GET` | `/get-data?command=` | Generic command passthrough (no token needed) |
 
 See [skills/README.md](skills/README.md) for full request/response examples, curl commands, and a Python usage guide.

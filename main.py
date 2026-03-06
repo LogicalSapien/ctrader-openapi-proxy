@@ -7,6 +7,7 @@ from ctrader_open_api.messages.OpenApiCommonMessages_pb2 import *
 from ctrader_open_api.messages.OpenApiMessages_pb2 import *
 from ctrader_open_api.messages.OpenApiModelMessages_pb2 import *
 import json
+import os
 from twisted.internet import endpoints, reactor
 from twisted.web.server import Site
 import sys
@@ -16,13 +17,15 @@ from google.protobuf.json_format import MessageToJson
 import calendar
 from dotenv import load_dotenv
 from twisted.web.server import NOT_DONE_YET
-from libs.config import CTRADER_TOKEN, CTRADER_CLIENT_ID, CTRADER_CLIENT_SECRET, CTRADER_HOST, CTRADER_ACCOUNTID
+from libs.config import CTRADER_TOKEN, CTRADER_REFRESH_TOKEN, CTRADER_CLIENT_ID, CTRADER_CLIENT_SECRET, CTRADER_HOST, CTRADER_ACCOUNTID
 from libs.logging_config import logger
+import re
 
 
 load_dotenv(".env")
 
 token = CTRADER_TOKEN
+refreshToken = CTRADER_REFRESH_TOKEN
 
 host = "localhost"
 port = 9009
@@ -35,6 +38,65 @@ currentAccountId = None
 auth = Auth(CTRADER_CLIENT_ID, CTRADER_CLIENT_SECRET, f"http://{host}:{port}/redirect")
 authUri = auth.getAuthUri()
 app = Klein()
+
+TOKEN_REFRESH_INTERVAL = 6 * 60 * 60  # 6 hours in seconds
+
+def updateEnvFile(newAccessToken, newRefreshToken):
+    """Update .env file with new token values so they persist across restarts."""
+    envPath = os.path.join(os.path.dirname(__file__), '.env')
+    try:
+        with open(envPath, 'r') as f:
+            content = f.read()
+        content = re.sub(r'^CTRADER_TOKEN=.*$', f'CTRADER_TOKEN={newAccessToken}', content, flags=re.MULTILINE)
+        content = re.sub(r'^CTRADER_REFRESH_TOKEN=.*$', f'CTRADER_REFRESH_TOKEN={newRefreshToken}', content, flags=re.MULTILINE)
+        if 'CTRADER_REFRESH_TOKEN=' not in content:
+            content = re.sub(r'^(CTRADER_TOKEN=.*)$', f'\\1\nCTRADER_REFRESH_TOKEN={newRefreshToken}', content, flags=re.MULTILINE)
+        with open(envPath, 'w') as f:
+            f.write(content)
+        logger.info("Updated .env file with new tokens")
+    except Exception as e:
+        logger.error(f"Failed to update .env file: {e}")
+
+def doTokenRefresh():
+    """Refresh the access token using the refresh token."""
+    global token, refreshToken
+    if not refreshToken:
+        logger.warning("No refresh token available — cannot refresh access token")
+        return False
+    try:
+        logger.info("Refreshing access token...")
+        result = auth.refreshToken(refreshToken)
+        if 'accessToken' in result:
+            token = result['accessToken']
+            refreshToken = result.get('refreshToken', refreshToken)
+            updateEnvFile(token, refreshToken)
+            logger.info("Access token refreshed successfully")
+            if currentAccountId:
+                reAuthAccount()
+            return True
+        else:
+            logger.error(f"Token refresh failed: {result}")
+            return False
+    except Exception as e:
+        logger.error(f"Token refresh error: {e}")
+        return False
+
+def reAuthAccount():
+    """Re-authorize the current account with the new token."""
+    if currentAccountId:
+        logger.info(f"Re-authorizing account {currentAccountId} with new token")
+        sendProtoOAAccountAuthReq()
+
+def scheduleTokenRefresh():
+    """Schedule periodic token refresh."""
+    if refreshToken:
+        reactor.callLater(TOKEN_REFRESH_INTERVAL, periodicTokenRefresh)
+        logger.info(f"Token refresh scheduled every {TOKEN_REFRESH_INTERVAL // 3600} hours")
+
+def periodicTokenRefresh():
+    """Periodically refresh the token."""
+    doTokenRefresh()
+    reactor.callLater(TOKEN_REFRESH_INTERVAL, periodicTokenRefresh)
 
 client = None
 
@@ -71,6 +133,9 @@ def onMessageReceived(client, message):
     elif message.payloadType == ProtoOAErrorRes().payloadType:
         pb = Protobuf.extract(message)
         logger.error(f"API error: {pb.errorCode} — {pb.description}")
+        if pb.errorCode in ("CH_ACCESS_TOKEN_INVALID", "INVALID_ACCESS_TOKEN", "ACCESS_TOKEN_EXPIRED"):
+            logger.info("Token expired or invalid — attempting refresh...")
+            doTokenRefresh()
     else:
         logger.info(f"Message received: payloadType={message.payloadType}")
 
@@ -490,6 +555,16 @@ def http_amend_order(request):
         request.setResponseCode(400)
         return json.dumps({'error': 'expected { orderId, volume?, limitPrice?, stopPrice? }'}).encode('utf-8')
 
+@app.route('/api/refresh-token', methods=['POST'])
+def http_refresh_token(request):
+    request.responseHeaders.addRawHeader(b"content-type", b"application/json")
+    success = doTokenRefresh()
+    if success:
+        return json.dumps({'result': 'Token refreshed successfully'}).encode('utf-8')
+    else:
+        request.setResponseCode(500)
+        return json.dumps({'error': 'Token refresh failed — check logs and ensure CTRADER_REFRESH_TOKEN is set'}).encode('utf-8')
+
 @app.route('/api/market-order', methods=['POST'])
 def http_market_order(request):
     body = request.content.read().decode('utf-8')
@@ -525,6 +600,7 @@ def main():
     client.setDisconnectedCallback(disconnected)
     client.setMessageReceivedCallback(onMessageReceived)
     client.startService()
+    scheduleTokenRefresh()
 
     endpoint_description = f"tcp6:port={port}:interface={host}"
     endpoint = endpoints.serverFromString(reactor, endpoint_description)

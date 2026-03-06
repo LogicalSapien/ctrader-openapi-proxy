@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../.env'))
 
 CTRADER_TOKEN         = os.getenv('CTRADER_TOKEN', '')
+CTRADER_REFRESH_TOKEN = os.getenv('CTRADER_REFRESH_TOKEN', '')
 CTRADER_CLIENT_ID     = os.getenv('CTRADER_CLIENT_ID', '')
 CTRADER_CLIENT_SECRET = os.getenv('CTRADER_CLIENT_SECRET', '')
 CTRADER_ACCOUNTID     = os.getenv('CTRADER_ACCOUNTID', '')
